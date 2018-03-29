@@ -9,6 +9,7 @@ sudo: false
 
 install:
   - go get -v -t ./...
+  - env GOOS=linux GOARCH=ppc64le go get -d -v -t ./...
 script:
   - source ./.travis/script
 after_success:
