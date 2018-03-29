@@ -18,7 +18,7 @@ you should use
 to modify that trust anchor **before** you import it to NSS.
 * This tool will probably prevent HPKP from working as intended, unless HPKP is
 applied to user-defined trust anchors.  Firefox is capable of doing this
-(though it's the not the default); Chromium is not AFAIK.
+(though it's not the default); Chromium is not AFAIK.
 
 ## Licence
 
