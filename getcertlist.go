@@ -196,7 +196,18 @@ func GetCKBICertList(nssCKBIDir, nssTempDir string) (
 			stdoutStderrCopyCkbi)
 	}
 
-	return GetCertList(nssTempDir)
+	allCertsMap, allCertsText, err := GetCertList(nssTempDir)
+	if err != nil {
+		return nil, "", fmt.Errorf("Error getting certificate list: %s", err)
+	}
+
+	numCerts := len(allCertsMap)
+	if numCerts < 1 {
+		return nil, "", fmt.Errorf("Insufficient CKBI certs (%d) -- "+
+			"you might be missing a shared library", numCerts)
+	}
+
+	return allCertsMap, allCertsText, nil
 }
 
 // GetCertsWithCrossSignatures returns the nicknames of all certs for which any
