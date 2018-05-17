@@ -37,6 +37,53 @@ type NSSCertificate struct {
 	DER         []byte
 }
 
+func parseCertListLine(nssDir, certLine string) (
+	nickname string, cert *NSSCertificate, err error) {
+	// Get the trust bits (e.g. "CP,C,") into their own string
+	certLineSplit := strings.Split(certLine, " ")
+	certLineTrust := certLineSplit[len(certLineSplit)-1]
+
+	// Separate the trust bits by usage (e.g. "CP")
+	certLineTrustSplit := strings.Split(certLineTrust, ",")
+	if len(certLineTrustSplit) != 3 {
+		return "", nil, fmt.Errorf("Trust attributes should have 3 usages")
+	}
+	certTLSTrust := certLineTrustSplit[0]
+	certSMIMETrust := certLineTrustSplit[1]
+	certJARXPITrust := certLineTrustSplit[2]
+
+	certNickname := strings.TrimSpace(strings.TrimSuffix(
+		certLine, certLineTrust))
+
+	log.Infof("Extracting DER certificate for %s", certNickname)
+
+	// Dump the cert's DER value
+	// AFAICT the "Subprocess launching with variable" warning from
+	// gas is a false alarm here.
+	// nolint: gas
+	cmdDumpCert := exec.Command(NSSCertutilName,
+		"-d", "sql:"+nssDir, "-L", "-n", certNickname, "-r")
+	certDER, err := cmdDumpCert.Output()
+	if err != nil {
+		exiterr, ok := err.(*exec.ExitError)
+		if ok {
+			return "", nil, fmt.Errorf("Error dumping "+
+				"cert '%s': certutil returned a "+
+				"nonzero exit code: %s\n%s\n%s",
+				certNickname, err, certDER,
+				string(exiterr.Stderr))
+		}
+		return "", nil, fmt.Errorf("Error dumping cert '%s': %s", certNickname, err)
+	}
+
+	return certNickname, &NSSCertificate{
+		TLSTrust:    certTLSTrust,
+		SMIMETrust:  certSMIMETrust,
+		JARXPITrust: certJARXPITrust,
+		DER:         certDER,
+	}, nil
+}
+
 func parseCertList(nssDir, allCertsText string) (map[string]NSSCertificate,
 	string, error) {
 	// One string per cert
@@ -59,49 +106,12 @@ func parseCertList(nssDir, allCertsText string) (map[string]NSSCertificate,
 			continue
 		}
 
-		// Get the trust bits (e.g. "CP,C,") into their own string
-		certLineSplit := strings.Split(certLineTrimmed, " ")
-		certLineTrust := certLineSplit[len(certLineSplit)-1]
-
-		// Separate the trust bits by usage (e.g. "CP")
-		certLineTrustSplit := strings.Split(certLineTrust, ",")
-		if len(certLineTrustSplit) != 3 {
-			return nil, "", fmt.Errorf("Trust attributes should have 3 usages")
-		}
-		certTLSTrust := certLineTrustSplit[0]
-		certSMIMETrust := certLineTrustSplit[1]
-		certJARXPITrust := certLineTrustSplit[2]
-
-		certNickname := strings.TrimSpace(strings.TrimSuffix(
-			certLineTrimmed, certLineTrust))
-
-		log.Infof("Extracting DER certificate for %s", certNickname)
-
-		// Dump the cert's DER value
-		// AFAICT the "Subprocess launching with variable" warning from
-		// gas is a false alarm here.
-		// nolint: gas
-		cmdDumpCert := exec.Command(NSSCertutilName,
-			"-d", "sql:"+nssDir, "-L", "-n", certNickname, "-r")
-		certDER, err := cmdDumpCert.Output()
+		certNickname, cert, err := parseCertListLine(nssDir, certLineTrimmed)
 		if err != nil {
-			exiterr, ok := err.(*exec.ExitError)
-			if ok {
-				return nil, "", fmt.Errorf("Error dumping "+
-					"cert '%s': certutil returned a "+
-					"nonzero exit code: %s\n%s\n%s",
-					certNickname, err, certDER,
-					string(exiterr.Stderr))
-			}
-			return nil, "", fmt.Errorf("Error dumping cert '%s': %s", certNickname, err)
+			return nil, "", fmt.Errorf("Error parsing cert line: %s", err)
 		}
 
-		certs[certNickname] = NSSCertificate{
-			TLSTrust:    certTLSTrust,
-			SMIMETrust:  certSMIMETrust,
-			JARXPITrust: certJARXPITrust,
-			DER:         certDER,
-		}
+		certs[certNickname] = *cert
 	}
 
 	return certs, allCertsText, nil
