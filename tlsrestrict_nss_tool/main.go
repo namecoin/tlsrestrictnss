@@ -80,13 +80,17 @@ func init() {
 func main() {
 	log.Info("Extracting CKBI certificate list")
 	CKBICerts, _, err := tlsrestrictnss.GetCKBICertList(
-		nssCKBIDirFlag.Value(), nssTempDirFlag.Value())
+		nssCKBIDirFlag.Value(), nssTempDirFlag.Value(),
+		rootPrefixFlag.Value(), intermediatePrefixFlag.Value(),
+		crossSignedPrefixFlag.Value())
 	log.Fatale(err, "Couldn't get CKBI certificate list")
 
 	// TODO: look into not extracting DER encoding if undoFlag is enabled
 	// (since it's not used in that case)
 	log.Info("Extracting destination NSS certificate list")
-	destCerts, _, err := tlsrestrictnss.GetCertList(nssDestDirFlag.Value())
+	destCerts, _, err := tlsrestrictnss.GetCertList(nssDestDirFlag.Value(),
+		rootPrefixFlag.Value(), intermediatePrefixFlag.Value(),
+		crossSignedPrefixFlag.Value())
 	log.Fatale(err, "Couldn't get destination certificate list")
 
 	var nicksToRemove, nicksToAdd []string

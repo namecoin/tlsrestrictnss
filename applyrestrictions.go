@@ -18,6 +18,7 @@
 package tlsrestrictnss
 
 import (
+	"encoding/pem"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -248,12 +249,18 @@ func distrustCertWithNickname(nssDestDir, nickname string) error {
 }
 
 func addCert(nssDestDir, nickname, trust string, DER []byte) error {
+	// Convert DER to PEM
+	PEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: DER})
+	if PEM == nil {
+		return fmt.Errorf("Error encoding DER certificate to PEM")
+	}
+
 	// Add the cert to NSS
 	// AFAICT the "Subprocess launching with variable" warning from gas is
 	// a false alarm here.
 	// nolint: gas
 	cmd := exec.Command(NSSCertutilName, "-d", "sql:"+
-		nssDestDir, "-A", "-t", trust, "-n", nickname)
+		nssDestDir, "-A", "-t", trust, "-n", nickname, "-a")
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -263,7 +270,7 @@ func addCert(nssDestDir, nickname, trust string, DER []byte) error {
 	c := make(chan error)
 
 	go func() {
-		_, cerr := stdin.Write(DER)
+		_, cerr := stdin.Write(PEM)
 		if cerr != nil {
 			c <- fmt.Errorf("Error writing to standard input pipe "+
 				"for certutil: %s", cerr)
