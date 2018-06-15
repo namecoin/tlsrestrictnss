@@ -19,7 +19,6 @@ package tlsrestrictnss
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -117,20 +116,13 @@ func applyAddRestrictedCerts(nssDestDir, nssCKBIDir string,
 	excludedDomain string) (err error) {
 	// Give certutil access to built-in certs (for purpose of untrusting
 	// original certs)
-	// AFAICT the "Subprocess launching with variable" warning from gas is
-	// a false alarm here.
-	// nolint: gas
-	cmdCopyCkbi := exec.Command("cp", nssCKBIDir+"/"+NSSCKBIName,
-		nssDestDir+"/")
-	stdoutStderrCopyCkbi, err := cmdCopyCkbi.CombinedOutput()
+	err = enableCKBIVisibility(nssCKBIDir, nssDestDir)
 	if err != nil {
-		return fmt.Errorf("Error copying CKBI: %s\n%s", err,
-			stdoutStderrCopyCkbi)
+		return fmt.Errorf("Error enabling CKBI visibility: %s", err)
 	}
 	defer func() {
-		if cerr := os.Remove(nssDestDir + "/" +
-			NSSCKBIName); cerr != nil && err == nil {
-			err = cerr
+		if cerr := disableCKBIVisibility(nssDestDir); cerr != nil && err == nil {
+			err = fmt.Errorf("Error disabling CKBI visibility: %s", cerr)
 		}
 	}()
 

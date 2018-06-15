@@ -185,18 +185,35 @@ func GetCKBICertList(nssCKBIDir, nssTempDir string) (
 	}()
 
 	// Give certutil access to built-in certs
-	// AFAICT the "Subprocess launching with variable" warning from gas is
-	// a false alarm here.
-	// nolint: gas
-	cmdCopyCkbi := exec.Command("cp", nssCKBIDir+"/"+NSSCKBIName,
-		nssTempDir+"/")
-	stdoutStderrCopyCkbi, err := cmdCopyCkbi.CombinedOutput()
+	err = enableCKBIVisibility(nssCKBIDir, nssTempDir)
 	if err != nil {
-		return nil, "", fmt.Errorf("Error copying CKBI: %s\n%s", err,
-			stdoutStderrCopyCkbi)
+		return nil, "", fmt.Errorf("Error enabling CKBI visibility: %s", err)
 	}
 
 	return GetCertList(nssTempDir)
+}
+
+func enableCKBIVisibility(nssCKBIDir, nssDir string) error {
+	CKBILibrary, err := ioutil.ReadFile(nssCKBIDir + "/" + NSSCKBIName)
+	if err != nil {
+		return fmt.Errorf("Error reading CKBI: %s", err)
+	}
+
+	err = ioutil.WriteFile(nssDir+"/"+NSSCKBIName, CKBILibrary, 0600)
+	if err != nil {
+		return fmt.Errorf("Error writing CKBI: %s", err)
+	}
+
+	return nil
+}
+
+func disableCKBIVisibility(nssDir string) error {
+	err := os.Remove(nssDir + "/" + NSSCKBIName)
+	if err != nil {
+		return fmt.Errorf("Error removing CKBI: %s", err)
+	}
+
+	return nil
 }
 
 // GetCertsWithCrossSignatures returns the nicknames of all certs for which any
@@ -435,11 +452,11 @@ func deleteTempDB(nssTempDir string) error {
 			"database directory: %s", err)
 	}
 
-	// Delete libnssckbi.so
-	err = os.Remove(nssTempDir + "/" + NSSCKBIName)
+	// Delete CKBI
+	err = disableCKBIVisibility(nssTempDir)
 	if err != nil {
-		return fmt.Errorf("Error deleting %s from temporary NSS "+
-			"database directory: %s", NSSCKBIName, err)
+		return fmt.Errorf("Error disabling CKBI visibility from temporary NSS "+
+			"database directory: %s", err)
 	}
 
 	return nil
