@@ -200,7 +200,18 @@ func GetCKBICertList(nssCKBIDir, nssTempDir string) (
 		return nil, "", fmt.Errorf("Error enabling CKBI visibility: %s", err)
 	}
 
-	return GetCertList(nssTempDir)
+	allCertsMap, allCertsText, err := GetCertList(nssTempDir)
+	if err != nil {
+		return nil, "", fmt.Errorf("Error getting certificate list: %s", err)
+	}
+
+	numCerts := len(allCertsMap)
+	if numCerts < 1 {
+		return nil, "", fmt.Errorf("Insufficient CKBI certs (%d) -- "+
+			"you might be missing a shared library", numCerts)
+	}
+
+	return allCertsMap, allCertsText, nil
 }
 
 func enableCKBIVisibility(nssCKBIDir, nssDir string) error {
