@@ -19,6 +19,8 @@ package tlsrestrictnss
 
 import (
 	"bytes"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -37,8 +39,9 @@ type NSSCertificate struct {
 	DER         []byte
 }
 
-func parseCertListLine(nssDir, certLine string) (
-	nickname string, cert *NSSCertificate, err error) {
+func parseCertListLine(nssDir, certLine, rootPrefix, intermediatePrefix,
+	crossSignedPrefix string) (nickname string, cert *NSSCertificate,
+	err error) {
 	// Get the trust bits (e.g. "CP,C,") into their own string
 	certLineSplit := strings.Split(certLine, " ")
 	certLineTrust := certLineSplit[len(certLineSplit)-1]
@@ -62,18 +65,26 @@ func parseCertListLine(nssDir, certLine string) (
 	// gas is a false alarm here.
 	// nolint: gas
 	cmdDumpCert := exec.Command(NSSCertutilName,
-		"-d", "sql:"+nssDir, "-L", "-n", certNickname, "-r")
-	certDER, err := cmdDumpCert.Output()
+		"-d", "sql:"+nssDir, "-L", "-n", certNickname, "-a")
+	certPEM, err := cmdDumpCert.Output()
 	if err != nil {
 		exiterr, ok := err.(*exec.ExitError)
 		if ok {
 			return "", nil, fmt.Errorf("Error dumping "+
 				"cert '%s': certutil returned a "+
 				"nonzero exit code: %s\n%s\n%s",
-				certNickname, err, certDER,
+				certNickname, err, certPEM,
 				string(exiterr.Stderr))
 		}
 		return "", nil, fmt.Errorf("Error dumping cert '%s': %s", certNickname, err)
+	}
+
+	certDER, err := getDERFromMultiplePEM(certPEM, certNickname,
+		rootPrefix, intermediatePrefix, crossSignedPrefix)
+	if err != nil {
+		return "", nil, fmt.Errorf(
+			"Error decoding PEM cert '%s' to DER: %s\n%s",
+			certNickname, err, certPEM)
 	}
 
 	return certNickname, &NSSCertificate{
@@ -84,8 +95,18 @@ func parseCertListLine(nssDir, certLine string) (
 	}, nil
 }
 
-func parseCertList(nssDir, allCertsText string) (map[string]NSSCertificate,
-	string, error) {
+type certType int8
+
+const (
+	certTypeOriginal certType = iota
+	certTypeRoot
+	certTypeIntermediate
+	certTypeCrossSigned
+	certTypeUnrecognized
+)
+
+func parseCertList(nssDir, allCertsText, rootPrefix, intermediatePrefix,
+	crossSignedPrefix string) (map[string]NSSCertificate, string, error) {
 	// One string per cert
 	certLines := strings.Split(allCertsText, "\n")
 
@@ -106,7 +127,9 @@ func parseCertList(nssDir, allCertsText string) (map[string]NSSCertificate,
 			continue
 		}
 
-		certNickname, cert, err := parseCertListLine(nssDir, certLineTrimmed)
+		certNickname, cert, err := parseCertListLine(nssDir,
+			certLineTrimmed, rootPrefix, intermediatePrefix,
+			crossSignedPrefix)
 		if err != nil {
 			return nil, "", fmt.Errorf("Error parsing cert line: %s", err)
 		}
@@ -117,22 +140,114 @@ func parseCertList(nssDir, allCertsText string) (map[string]NSSCertificate,
 	return certs, allCertsText, nil
 }
 
+func getTypeFromNickname(certNickname, rootPrefix, intermediatePrefix,
+	crossSignedPrefix string) certType {
+	if strings.HasPrefix(certNickname, rootPrefix) {
+		return certTypeRoot
+	} else if strings.HasPrefix(certNickname, intermediatePrefix) {
+		return certTypeIntermediate
+	} else if strings.HasPrefix(certNickname, crossSignedPrefix) {
+		return certTypeCrossSigned
+	}
+
+	return certTypeOriginal
+}
+
+func getTypeFromX509Cert(cert *x509.Certificate, rootPrefix,
+	intermediatePrefix, crossSignedPrefix string) certType {
+	issuerType := getTypeFromNickname(cert.Issuer.CommonName, rootPrefix,
+		intermediatePrefix, crossSignedPrefix)
+	subjectType := getTypeFromNickname(cert.Subject.CommonName, rootPrefix,
+		intermediatePrefix, crossSignedPrefix)
+
+	if issuerType == certTypeRoot && subjectType == certTypeRoot {
+		return certTypeRoot
+	} else if issuerType == certTypeRoot &&
+		subjectType == certTypeIntermediate {
+		return certTypeIntermediate
+	} else if issuerType == certTypeIntermediate &&
+		subjectType == certTypeCrossSigned {
+		return certTypeCrossSigned
+	} else if issuerType == certTypeOriginal && subjectType == certTypeOriginal {
+		return certTypeOriginal
+	}
+
+	return certTypeUnrecognized
+}
+
+func getDERFromMultiplePEM(certPEM []byte, certNickname, rootPrefix,
+	intermediatePrefix, crossSignedPrefix string) ([]byte, error) {
+	var block *pem.Block
+	rest := certPEM
+
+	validDERFound := false
+	var validDER []byte
+
+	for {
+		block, rest = pem.Decode(rest)
+		if block == nil {
+			// We've reached the end of the PEM input
+			break
+		}
+		if block.Type != "CERTIFICATE" {
+			return nil, fmt.Errorf("PEM block wasn't a certificate: %s", block.Type)
+		}
+
+		cert, err := x509.ParseCertificate(block.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("Error parsing DER certificate: %s", err)
+		}
+
+		thisNicknameType := getTypeFromNickname(certNickname,
+			rootPrefix, intermediatePrefix, crossSignedPrefix)
+		thisCertType := getTypeFromX509Cert(cert, rootPrefix,
+			intermediatePrefix, crossSignedPrefix)
+
+		if thisCertType == certTypeUnrecognized {
+			return nil, fmt.Errorf("Certificate Issuer/Subject "+
+				"prefixes unrecognized.  Issuer '%s', "+
+				"Subject '%s'", cert.Issuer.CommonName,
+				cert.Subject.CommonName)
+		}
+
+		certIsValid := thisNicknameType == thisCertType
+
+		if certIsValid && validDERFound {
+			return nil, fmt.Errorf("Found duplicate certificates in PEM")
+		}
+
+		if certIsValid {
+			validDER = block.Bytes
+			validDERFound = true
+		}
+	}
+
+	if !validDERFound {
+		return nil, fmt.Errorf("Error decoding PEM block")
+	}
+
+	return validDER, nil
+}
+
 // GetOldCKBICertList gets a previously extracted list of CKBI certificates
 // from the file "old_ckbi_list.txt" in the specified directory.  (This
 // function is unused legacy code and may be removed at any time.)
-func GetOldCKBICertList(nssDir string) (map[string]NSSCertificate, string,
+func GetOldCKBICertList(nssDir, rootPrefix, intermediatePrefix,
+	crossSignedPrefix string) (map[string]NSSCertificate, string,
 	error) {
 	allCertsText, err := ioutil.ReadFile(nssDir + "/old_ckbi_list.txt")
 	if err != nil {
 		return nil, "", fmt.Errorf("Error listing old certs: %s", err)
 	}
 
-	return parseCertList(nssDir, string(allCertsText))
+	return parseCertList(nssDir, string(allCertsText), rootPrefix,
+		intermediatePrefix, crossSignedPrefix)
 }
 
 // GetCertList extracts the certificates from the NSS sqlite database in
 // nssDir.
-func GetCertList(nssDir string) (map[string]NSSCertificate, string, error) {
+func GetCertList(nssDir, rootPrefix, intermediatePrefix,
+	crossSignedPrefix string) (map[string]NSSCertificate, string, error) {
 	// Get a list of all certs
 	// AFAICT the "Subprocess launching with variable" warning from gas is
 	// a false alarm here.
@@ -173,14 +288,16 @@ func GetCertList(nssDir string) (map[string]NSSCertificate, string, error) {
 		}
 	}
 
-	return parseCertList(nssDir, string(allCertsText))
+	return parseCertList(nssDir, string(allCertsText), rootPrefix,
+		intermediatePrefix, crossSignedPrefix)
 }
 
 // GetCKBICertList extracts the certificates from a Mozilla CKBI (built-in
 // certificates) module.  nssCKBIDir should contain a Mozilla CKBI module
 // (usually libnssckbi.so); nssTempDir should be an empty directory that only
 // trusted applications can read or write to.
-func GetCKBICertList(nssCKBIDir, nssTempDir string) (
+func GetCKBICertList(nssCKBIDir, nssTempDir, rootPrefix, intermediatePrefix,
+	crossSignedPrefix string) (
 	certs map[string]NSSCertificate, rawCerts string, err error) {
 	// Create empty temporary NSS database
 	err = createTempDB(nssTempDir)
@@ -200,7 +317,8 @@ func GetCKBICertList(nssCKBIDir, nssTempDir string) (
 		return nil, "", fmt.Errorf("Error enabling CKBI visibility: %s", err)
 	}
 
-	allCertsMap, allCertsText, err := GetCertList(nssTempDir)
+	allCertsMap, allCertsText, err := GetCertList(nssTempDir, rootPrefix,
+		intermediatePrefix, crossSignedPrefix)
 	if err != nil {
 		return nil, "", fmt.Errorf("Error getting certificate list: %s", err)
 	}
@@ -291,21 +409,8 @@ func trustAtributesChanged(cert1, cert2 NSSCertificate) (bool, string) {
 	return false, ""
 }
 
-// TODO: use PEM encoding for this instead, so that we don't have to worry
-// about boundary detection
 func derValueChanged(cert1, cert2 NSSCertificate) bool {
-	// When 2 certificates with the same Subject exist in the
-	// destination DB, we actually end up with a concatenation of
-	// both DER values.  So we have to do a prefix match and a
-	// suffix match rather than an exact match.
-	if len(cert2.DER) < len(cert1.DER) ||
-		(len(cert2.DER) >= len(cert1.DER) &&
-			!bytes.Equal(cert1.DER, cert2.DER[0:len(cert1.DER)]) &&
-			!bytes.Equal(cert1.DER,
-				cert2.DER[len(cert2.DER)-len(cert1.DER):len(cert2.DER)])) {
-		return true
-	}
-	return false
+	return !bytes.Equal(cert1.DER, cert2.DER)
 }
 
 func shouldTLSRootCABeRemoved(nickname string,
