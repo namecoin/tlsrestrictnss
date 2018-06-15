@@ -166,7 +166,7 @@ func getTypeFromX509Cert(cert *x509.Certificate, rootPrefix,
 		subjectType == certTypeIntermediate {
 		return certTypeIntermediate
 	} else if issuerType == certTypeIntermediate &&
-		subjectType == certTypeCrossSigned {
+		subjectType == certTypeOriginal {
 		return certTypeCrossSigned
 	} else if issuerType == certTypeOriginal && subjectType == certTypeOriginal {
 		return certTypeOriginal
