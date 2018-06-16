@@ -20,6 +20,8 @@ package tlsrestrictnss
 import (
 	"encoding/pem"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -191,13 +193,27 @@ func stripModuleFromNickname(nickname string) string {
 	return nickname
 }
 
-func deleteCertWithNickname(nssDestDir, nickname string) error {
-	// Delete the cert from NSS
+func deleteCertWithNickname(nssDestDir, nickname string) (err error) {
+	// Write an NSS batch file to delete the cert from NSS
+	// Batch files are needed in order to handle Unicode nicknames
+	// on Windows.
+	batchPath := nssDestDir + "/" + "tlsrestrict_nss_batch.txt"
+	err = ioutil.WriteFile(batchPath, []byte("-D -n \""+nickname+"\"\n"), 0600)
+	if err != nil {
+		return fmt.Errorf("Error writing certutil batch file: %s", err)
+	}
+	defer func() {
+		if cerr := os.Remove(batchPath); cerr != nil && err == nil {
+			err = fmt.Errorf("Error removing certutil batch file: %s", cerr)
+		}
+	}()
+
+	// Execute the NSS batch file with certutil.
 	// AFAICT the "Subprocess launching with variable" warning from gas is
 	// a false alarm here.
 	// nolint: gas
 	cmd := exec.Command(NSSCertutilName, "-d", "sql:"+
-		nssDestDir, "-D", "-n", nickname)
+		nssDestDir, "-B", "-i", batchPath)
 
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {
@@ -222,13 +238,28 @@ func deleteCertWithNickname(nssDestDir, nickname string) error {
 	return nil
 }
 
-func distrustCertWithNickname(nssDestDir, nickname string) error {
-	// Distrust the cert in NSS
+func distrustCertWithNickname(nssDestDir, nickname string) (err error) {
+	// Write an NSS batch file to distrust the cert in NSS
+	// Batch files are needed in order to handle Unicode nicknames
+	// on Windows.
+	batchPath := nssDestDir + "/" + "tlsrestrict_nss_batch.txt"
+	err = ioutil.WriteFile(batchPath,
+		[]byte("-M -n \""+nickname+"\" -t ,,\n"), 0600)
+	if err != nil {
+		return fmt.Errorf("Error writing certutil batch file: %s", err)
+	}
+	defer func() {
+		if cerr := os.Remove(batchPath); cerr != nil && err == nil {
+			err = fmt.Errorf("Error removing certutil batch file: %s", cerr)
+		}
+	}()
+
+	// Execute the NSS batch file with certutil.
 	// AFAICT the "Subprocess launching with variable" warning from gas is
 	// a false alarm here.
 	// nolint: gas
 	cmd := exec.Command(NSSCertutilName, "-d", "sql:"+
-		nssDestDir, "-M", "-n", nickname, "-t", ",,")
+		nssDestDir, "-B", "-i", batchPath)
 
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {
@@ -248,19 +279,34 @@ func distrustCertWithNickname(nssDestDir, nickname string) error {
 	return nil
 }
 
-func addCert(nssDestDir, nickname, trust string, DER []byte) error {
+func addCert(nssDestDir, nickname, trust string, DER []byte) (err error) {
 	// Convert DER to PEM
 	PEM := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: DER})
 	if PEM == nil {
 		return fmt.Errorf("Error encoding DER certificate to PEM")
 	}
 
-	// Add the cert to NSS
+	// Write an NSS batch file to add the cert to NSS.
+	// Batch files are needed in order to handle Unicode nicknames
+	// on Windows.
+	batchPath := nssDestDir + "/" + "tlsrestrict_nss_batch.txt"
+	err = ioutil.WriteFile(batchPath,
+		[]byte("-A -t "+trust+" -n \""+nickname+"\" -a\n"), 0600)
+	if err != nil {
+		return fmt.Errorf("Error writing certutil batch file: %s", err)
+	}
+	defer func() {
+		if cerr := os.Remove(batchPath); cerr != nil && err == nil {
+			err = fmt.Errorf("Error removing certutil batch file: %s", cerr)
+		}
+	}()
+
+	// Execute the NSS batch file with certutil.
 	// AFAICT the "Subprocess launching with variable" warning from gas is
 	// a false alarm here.
 	// nolint: gas
 	cmd := exec.Command(NSSCertutilName, "-d", "sql:"+
-		nssDestDir, "-A", "-t", trust, "-n", nickname, "-a")
+		nssDestDir, "-B", "-i", batchPath)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

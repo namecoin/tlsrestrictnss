@@ -60,13 +60,29 @@ func parseCertListLine(nssDir, certLine, rootPrefix, intermediatePrefix,
 
 	log.Infof("Extracting DER certificate for %s", certNickname)
 
-	// Dump the cert's DER value
+	// Write an NSS batch file to dump the cert's DER value.
+	// Batch files are needed in order to handle Unicode nicknames
+	// on Windows.
+	batchPath := nssDir + "/" + "tlsrestrict_nss_batch.txt"
+	err = ioutil.WriteFile(batchPath,
+		[]byte("-L -n \""+certNickname+"\" -a\n"), 0600)
+	if err != nil {
+		return "", nil, fmt.Errorf("Error writing certutil batch file: %s", err)
+	}
+	defer func() {
+		if cerr := os.Remove(batchPath); cerr != nil && err == nil {
+			err = fmt.Errorf("Error removing certutil batch file: %s", cerr)
+		}
+	}()
+
+	// Execute the NSS batch file with certutil.
 	// AFAICT the "Subprocess launching with variable" warning from
 	// gas is a false alarm here.
 	// nolint: gas
 	cmdDumpCert := exec.Command(NSSCertutilName,
-		"-d", "sql:"+nssDir, "-L", "-n", certNickname, "-a")
+		"-d", "sql:"+nssDir, "-B", "-i", batchPath)
 	certPEM, err := cmdDumpCert.Output()
+
 	if err != nil {
 		exiterr, ok := err.(*exec.ExitError)
 		if ok {
@@ -106,11 +122,12 @@ const (
 )
 
 func parseCertList(nssDir, allCertsText, rootPrefix, intermediatePrefix,
-	crossSignedPrefix string) (map[string]NSSCertificate, string, error) {
+	crossSignedPrefix string) (certs map[string]NSSCertificate,
+	allCertsTextPassThrough string, err error) {
 	// One string per cert
 	certLines := strings.Split(allCertsText, "\n")
 
-	certs := make(map[string]NSSCertificate)
+	certs = make(map[string]NSSCertificate)
 
 	for _, certLine := range certLines {
 		// Filter out whitespace padding at start/end
