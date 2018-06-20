@@ -59,7 +59,7 @@ var config = easyconfig.Configurator{
 	ProgramName: "tlsrestrict_nss_tool",
 }
 
-func init() {
+func parseConfig() {
 	err := config.Parse(nil)
 	if err != nil {
 		log.Fatalf("Couldn't parse configuration: %s", err)
@@ -78,6 +78,8 @@ func init() {
 }
 
 func main() {
+	parseConfig()
+
 	log.Info("Extracting CKBI certificate list")
 	CKBICerts, _, err := tlsrestrictnss.GetCKBICertList(
 		nssCKBIDirFlag.Value(), nssTempDirFlag.Value(),
