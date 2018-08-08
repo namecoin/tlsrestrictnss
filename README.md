@@ -8,6 +8,12 @@ such as:
 * The `.bit` TLD used by Namecoin.
 * A TLD controlled by your corporate intranet.
 
+## Requirements
+
+tlsrestrictnss requires Go 1.10.0 or higher; this requirement is
+[inherited](https://github.com/namecoin/crosssignnameconstraint/blob/master/README.md#requirements)
+from the crosssignnameconstraint dependency.
+
 ## Warnings
 
 * This tool only applies name constraints to certificates from Mozilla's CKBI
