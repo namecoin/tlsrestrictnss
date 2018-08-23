@@ -17,6 +17,7 @@ gometalinter.v2 --install
 echo ""
 echo "gometalinter critical (should be no warnings):"
 gometalinter.v2 --enable-all \
+--disable=gochecknoglobals \
 --concurrency=3 \
 --deadline=10m \
 ./...
