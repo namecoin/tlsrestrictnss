@@ -80,52 +80,11 @@ func parseConfig() {
 func main() {
 	parseConfig()
 
-	log.Info("Extracting CKBI certificate list")
-	CKBICerts, _, err := tlsrestrictnss.GetCKBICertList(
+	err := tlsrestrictnss.CalculateAndApplyConstraints(
 		nssCKBIDirFlag.Value(), nssTempDirFlag.Value(),
-		rootPrefixFlag.Value(), intermediatePrefixFlag.Value(),
-		crossSignedPrefixFlag.Value())
-	log.Fatale(err, "Couldn't get CKBI certificate list")
+		nssDestDirFlag.Value(), rootPrefixFlag.Value(),
+		intermediatePrefixFlag.Value(), crossSignedPrefixFlag.Value(),
+		excludedDomainFlag.Value(), undoFlag.Value())
 
-	// TODO: look into not extracting DER encoding if undoFlag is enabled
-	// (since it's not used in that case)
-	log.Info("Extracting destination NSS certificate list")
-	destCerts, _, err := tlsrestrictnss.GetCertList(nssDestDirFlag.Value(),
-		rootPrefixFlag.Value(), intermediatePrefixFlag.Value(),
-		crossSignedPrefixFlag.Value())
-	log.Fatale(err, "Couldn't get destination certificate list")
-
-	var nicksToRemove, nicksToAdd []string
-	var opLabel string
-
-	if undoFlag.Value() {
-		opLabel = "undo"
-
-		log.Info("Calculating certificates to undo")
-		nicksToRemove, err =
-			tlsrestrictnss.GetCertsWithCrossSignatures(destCerts,
-				rootPrefixFlag.Value(),
-				intermediatePrefixFlag.Value(),
-				crossSignedPrefixFlag.Value())
-		log.Fatale(err, "Couldn't calculate certificates to undo")
-	} else {
-		opLabel = "restriction"
-
-		log.Info("Calculating certificates to remove")
-		nicksToRemove, err = tlsrestrictnss.GetCertsToRemove(CKBICerts,
-			destCerts, rootPrefixFlag.Value())
-		log.Fatale(err, "Couldn't calculate certificates to remove")
-
-		log.Info("Calculating certificates to add")
-		nicksToAdd, err = tlsrestrictnss.GetCertsToAdd(CKBICerts, destCerts,
-			rootPrefixFlag.Value())
-		log.Fatale(err, "Couldn't calculate certificates to add")
-	}
-
-	log.Infof("Applying %s operation to NSS destination DB", opLabel)
-	err = tlsrestrictnss.ApplyRestrictions(nssDestDirFlag.Value(),
-		nssCKBIDirFlag.Value(), CKBICerts, nicksToRemove, nicksToAdd,
-		rootPrefixFlag.Value(), intermediatePrefixFlag.Value(),
-		crossSignedPrefixFlag.Value(), excludedDomainFlag.Value())
-	log.Fatalef(err, "Couldn't apply %s operation", opLabel)
+	log.Fatale(err, "tlsrestrictnss error")
 }
