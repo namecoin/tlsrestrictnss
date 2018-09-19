@@ -217,7 +217,16 @@ func deleteCertWithNickname(nssDestDir, nickname string) (err error) {
 
 	stdoutStderr, err := cmd.CombinedOutput()
 	if err != nil {
-		if strings.Contains(string(stdoutStderr), "SEC_ERROR_UNRECOGNIZED_OID") {
+		// If the specified certificate is already not present in the
+		// NSS database, then we can safely ignore the error.
+		// Unfortunately, different NSS versions return a different
+		// error code for this case.  Older NSS versions (e.g. the
+		// version in Fedora 26) return SEC_ERROR_UNRECOGNIZED_OID,
+		// while newer NSS versions (e.g. the version in Fedora 28)
+		// return SEC_ERROR_INVALID_ARGS.  So we need to check for
+		// both.
+		if strings.Contains(string(stdoutStderr), "SEC_ERROR_UNRECOGNIZED_OID") ||
+			strings.Contains(string(stdoutStderr), "SEC_ERROR_INVALID_ARGS") {
 			log.Warn("Tried to delete certificate from NSS " +
 				"database, but the certificate was already " +
 				"not present in NSS database")

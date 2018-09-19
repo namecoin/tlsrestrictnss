@@ -246,21 +246,6 @@ func getDERFromMultiplePEM(certPEM []byte, certNickname, rootPrefix,
 	return validDER, nil
 }
 
-// GetOldCKBICertList gets a previously extracted list of CKBI certificates
-// from the file "old_ckbi_list.txt" in the specified directory.  (This
-// function is unused legacy code and may be removed at any time.)
-func GetOldCKBICertList(nssDir, rootPrefix, intermediatePrefix,
-	crossSignedPrefix string) (map[string]NSSCertificate, string,
-	error) {
-	allCertsText, err := ioutil.ReadFile(nssDir + "/old_ckbi_list.txt")
-	if err != nil {
-		return nil, "", fmt.Errorf("Error listing old certs: %s", err)
-	}
-
-	return parseCertList(nssDir, string(allCertsText), rootPrefix,
-		intermediatePrefix, crossSignedPrefix)
-}
-
 // GetCertList extracts the certificates from the NSS sqlite database in
 // nssDir.
 func GetCertList(nssDir, rootPrefix, intermediatePrefix,
@@ -350,6 +335,7 @@ func GetCKBICertList(nssCKBIDir, nssTempDir, rootPrefix, intermediatePrefix,
 }
 
 func enableCKBIVisibility(nssCKBIDir, nssDir string) error {
+	// #nosec G304
 	CKBILibrary, err := ioutil.ReadFile(nssCKBIDir + "/" + NSSCKBIName)
 	if err != nil {
 		return fmt.Errorf("Error reading CKBI: %s", err)
