@@ -15,9 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with tlsrestrictnss.  If not, see <https://www.gnu.org/licenses/>.
 
-package tlsrestrictnss
+package tlsrestrictnsssync
 
 const (
-	// NSSCKBIName is the filename of the NSS CKBI shared library.
-	NSSCKBIName = "nssckbi.dll"
+	lastVersionRegistryKey = `SOFTWARE\Namecoin\ncdns`
 )

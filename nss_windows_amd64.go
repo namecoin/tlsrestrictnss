@@ -18,6 +18,6 @@
 package tlsrestrictnss
 
 const (
-	// NSSCKBIName is the filename of the NSS CKBI shared library.
-	NSSCKBIName = "nssckbi.dll"
+	// NSSCertutilName is the executable name of NSS certutil.
+	NSSCertutilName = "mar-tools-64/nss-certutil"
 )

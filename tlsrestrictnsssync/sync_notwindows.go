@@ -1,3 +1,5 @@
+// +build !windows
+
 // Copyright 2018 Jeremy Rand.
 
 // This file is part of tlsrestrictnss.
@@ -15,9 +17,17 @@
 // You should have received a copy of the GNU General Public License
 // along with tlsrestrictnss.  If not, see <https://www.gnu.org/licenses/>.
 
-package tlsrestrictnss
+package tlsrestrictnsssync
 
-const (
-	// NSSCKBIName is the filename of the NSS CKBI shared library.
-	NSSCKBIName = "nssckbi.dll"
-)
+// IsReady returns true if the name constraints are successfully synced.  If it
+// returns false, it may be unsafe for TLS connections to rely on the synced
+// name constraints.
+func IsReady() bool {
+	return true
+}
+
+// Start starts a background thread that synchronizes the configured name
+// constraints to the NSS database.
+func Start() error {
+	return nil
+}
