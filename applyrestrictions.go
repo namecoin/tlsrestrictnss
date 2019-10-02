@@ -209,9 +209,9 @@ func deleteCertWithNickname(nssDestDir, nickname string) (err error) {
 	}()
 
 	// Execute the NSS batch file with certutil.
-	// AFAICT the "Subprocess launching with variable" warning from gas is
+	// AFAICT the "Subprocess launched with variable" warning from gosec is
 	// a false alarm here.
-	// nolint: gas
+	// #nosec G204
 	cmd := exec.Command(NSSCertutilName, "-d", "sql:"+
 		nssDestDir, "-B", "-i", batchPath)
 
@@ -264,9 +264,9 @@ func distrustCertWithNickname(nssDestDir, nickname string) (err error) {
 	}()
 
 	// Execute the NSS batch file with certutil.
-	// AFAICT the "Subprocess launching with variable" warning from gas is
+	// AFAICT the "Subprocess launched with variable" warning from gosec is
 	// a false alarm here.
-	// nolint: gas
+	// #nosec G204
 	cmd := exec.Command(NSSCertutilName, "-d", "sql:"+
 		nssDestDir, "-B", "-i", batchPath)
 
@@ -311,9 +311,9 @@ func addCert(nssDestDir, nickname, trust string, DER []byte) (err error) {
 	}()
 
 	// Execute the NSS batch file with certutil.
-	// AFAICT the "Subprocess launching with variable" warning from gas is
+	// AFAICT the "Subprocess launched with variable" warning from gosec is
 	// a false alarm here.
-	// nolint: gas
+	// #nosec G204
 	cmd := exec.Command(NSSCertutilName, "-d", "sql:"+
 		nssDestDir, "-B", "-i", batchPath)
 
