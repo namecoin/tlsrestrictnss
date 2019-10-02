@@ -4,6 +4,12 @@ go:
   - "1.10.x"
   - "master"
 
+notifications:
+  irc:
+    channels:
+      - "chat.freenode.net#namecoin-dev"
+    on_success: never
+
 sudo: false
 
 install:
