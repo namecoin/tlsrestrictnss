@@ -76,9 +76,9 @@ func parseCertListLine(nssDir, certLine, rootPrefix, intermediatePrefix,
 	}()
 
 	// Execute the NSS batch file with certutil.
-	// AFAICT the "Subprocess launching with variable" warning from
+	// AFAICT the "Subprocess launched with variable" warning from gosec is
 	// gas is a false alarm here.
-	// nolint: gas
+	// #nosec G204
 	cmdDumpCert := exec.Command(NSSCertutilName,
 		"-d", "sql:"+nssDir, "-B", "-i", batchPath)
 	certPEM, err := cmdDumpCert.Output()
@@ -251,9 +251,9 @@ func getDERFromMultiplePEM(certPEM []byte, certNickname, rootPrefix,
 func GetCertList(nssDir, rootPrefix, intermediatePrefix,
 	crossSignedPrefix string) (map[string]NSSCertificate, string, error) {
 	// Get a list of all certs
-	// AFAICT the "Subprocess launching with variable" warning from gas is
+	// AFAICT the "Subprocess launched with variable" warning from gosec is
 	// a false alarm here.
-	// nolint: gas
+	// #nosec G204
 	cmdListCerts := exec.Command(NSSCertutilName,
 		"-d", "sql:"+nssDir, "-L", "-h", "all")
 	allCertsText, err := cmdListCerts.Output()
@@ -545,9 +545,9 @@ func GetCertsToAdd(CKBICerts, destCerts map[string]NSSCertificate,
 
 func createTempDB(nssTempDir string) error {
 	// Create database
-	// AFAICT the "Subprocess launching with variable" warning from gas is
+	// AFAICT the "Subprocess launched with variable" warning from gosec is
 	// a false alarm here.
-	// nolint: gas
+	// #nosec G204
 	cmdCreateDB := exec.Command(NSSCertutilName,
 		"-d", "sql:"+nssTempDir, "-N", "--empty-password")
 	stdoutStderrCreateDB, err := cmdCreateDB.CombinedOutput()
