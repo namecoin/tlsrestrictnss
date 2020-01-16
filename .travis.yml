@@ -2,6 +2,7 @@ language: go
 go:
   - "1.10.x"
   - "1.11.x"
+  - "1.12.5"
   - "1.12.x"
   - "1.13.x"
   - "1.x"
@@ -28,4 +29,4 @@ env:
     # GITHUB_TOKEN for automatic releases
     - secure: "a8Xx65pMLLyJAzF38cu9iiQSKUyDdPuiCBfx1z5+NQ55sse8hkjZNZnuMqW54X9IgVeAQNoBfKHQ6x+bMYK0i48v0gU9iJg3bBlV7ytG3deqlxjDtCUF/znUzABtb4uBx1ScLg9QSLf5byMeSUKdXIrsRRANeKzYXbMJO/V4rv9xI0JiJ/jmDwkOumHdSCHZaihT2COx7MO78yA6gsYFoj3HraFseEW4wu2BEMljRbPr9pngK7TljmjsPPahEnrJRLgBrMYoKgVvb7coRCjrvYYWMN8GPju7duopJIcRT6KkMsB71aTl+Yunzb5ChFsmgmMXrLCbYzvjbCKXxyiRgQCGLCuWHOOoui6VR8if5PjolqgIPnzJF19WjPyuv5dcbvZwPo71rv3DU2Dl1hM+eHV6D79WqFHG5wNwpSMrx55+7nq7YZNkp+Uw+NJYjoqWpcBKhkX5hfnCGkXaprko6CiIcnhGMsg8tGi5tnTMe9H8prwCVQ5A2yTeL3qFiQ+DHxY5hmWO7ALEwfMqTDifgued3de2JfRwDoDS7y9D6tw5E6gOMrcKFPSfKG9Ahp8hOpsGM9RBdnzTJdgpEfN61oetyxmJofGEQhBAnGjsUrsrFsml82ZDDjxvVITJ+cu+a50K4flnXc2jUSllx7RGXhzXOv/7J3sQgFW3WXvWqzY="
     # Set this to the Go version to use for releases (must appear in version list above).
-    - RELEASE_GO_VERSION="1.10"
+    - RELEASE_GO_VERSION="1.12.5"
