@@ -248,7 +248,7 @@ func setLastSyncedVersion(version string) error {
 // name constraints.
 func IsReady() bool {
 	syncFailureMux.Lock()
-	result := !syncFailure
+	result := !syncFailure || !syncEnableFlag.Value()
 	syncFailureMux.Unlock()
 
 	return result
